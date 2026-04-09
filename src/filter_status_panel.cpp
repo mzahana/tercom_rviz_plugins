@@ -4,6 +4,8 @@
 #include <QHBoxLayout>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QPushButton>
+#include <QTimer>
 #include <QString>
 #include <pluginlib/class_list_macros.hpp>
 #include <rviz_common/display_context.hpp>
@@ -129,6 +131,42 @@ FilterStatusPanel::FilterStatusPanel(QWidget* parent)
   bias_grid->addWidget(new QLabel("rad/s", bias_group), 1, 4);
 
   root->addWidget(bias_group);
+
+  // ── Estimated Position ────────────────────────────────────────────────────
+  auto* pos_group = new QGroupBox("Estimated Position", this);
+  auto* pos_grid  = new QGridLayout(pos_group);
+  pos_grid->setSpacing(3);
+
+  pos_grid->addWidget(new QLabel("Lat:", pos_group), 0, 0);
+  lat_lbl_ = new QLabel("—", pos_group);
+  lat_lbl_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  pos_grid->addWidget(lat_lbl_, 0, 1);
+  pos_grid->addWidget(new QLabel("°", pos_group), 0, 2);
+
+  pos_grid->addWidget(new QLabel("Lon:", pos_group), 1, 0);
+  lon_lbl_ = new QLabel("—", pos_group);
+  lon_lbl_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  pos_grid->addWidget(lon_lbl_, 1, 1);
+  pos_grid->addWidget(new QLabel("°", pos_group), 1, 2);
+
+  pos_grid->addWidget(new QLabel("Alt:", pos_group), 2, 0);
+  alt_lbl_ = new QLabel("—", pos_group);
+  alt_lbl_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  pos_grid->addWidget(alt_lbl_, 2, 1);
+  pos_grid->addWidget(new QLabel("m", pos_group), 2, 2);
+
+  root->addWidget(pos_group);
+
+  // ── Reset Filter button ───────────────────────────────────────────────────
+  reset_btn_ = new QPushButton("Reset Filter", this);
+  reset_btn_->setStyleSheet(
+    "QPushButton { background:#3d1a0a; color:#e67e22; border:1px solid #a04010;"
+    " border-radius:4px; padding:5px 10px; font-weight:bold; font-size:11px; }"
+    "QPushButton:hover { background:#5a2a10; color:#f39c12; }"
+    "QPushButton:pressed { background:#2a0d00; }"
+    "QPushButton:disabled { background:#2a2a2a; color:#555; }");
+  root->addWidget(reset_btn_);
+
   root->addStretch();
 
   // Connect signals → slots (cross-thread safe)
@@ -147,6 +185,11 @@ FilterStatusPanel::FilterStatusPanel(QWidget* parent)
   connect(this, &FilterStatusPanel::biasGyroReceived,
           this, &FilterStatusPanel::onBiasGyroReceived,
           Qt::QueuedConnection);
+  connect(this, &FilterStatusPanel::positionReceived,
+          this, &FilterStatusPanel::onPositionReceived,
+          Qt::QueuedConnection);
+  connect(reset_btn_, &QPushButton::clicked,
+          this, &FilterStatusPanel::onResetClicked);
 }
 
 // ── onInitialize ──────────────────────────────────────────────────────────────
@@ -189,6 +232,18 @@ void FilterStatusPanel::onInitialize() {
         static_cast<float>(msg->vector.y),
         static_cast<float>(msg->vector.z));
     });
+
+  sub_global_ = node_->create_subscription<sensor_msgs::msg::NavSatFix>(
+    "/tercom/eskf_node/global", rclcpp::QoS(10),
+    [this](const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+      Q_EMIT positionReceived(
+        msg->latitude, msg->longitude,
+        static_cast<float>(msg->altitude),
+        static_cast<int>(msg->status.status));
+    });
+
+  reset_client_ = node_->create_client<std_srvs::srv::Trigger>(
+    "/tercom/eskf_node/reset_filter");
 }
 
 // ── Slots ─────────────────────────────────────────────────────────────────────
@@ -291,6 +346,61 @@ void FilterStatusPanel::onBiasGyroReceived(float x, float y, float z) {
   applyBiasColor(gx_, x);
   applyBiasColor(gy_, y);
   applyBiasColor(gz_, z);
+}
+
+void FilterStatusPanel::onPositionReceived(double lat, double lon, float alt, int status) {
+  // status: -1=NO_FIX, 0=FIX, 1=SBAS_FIX, 2=GBAS_FIX
+  const bool valid = (status >= 0);
+  const QString style_valid   = "color: #2ecc71;";
+  const QString style_invalid = "color: #888;";
+
+  if (valid) {
+    lat_lbl_->setText(QString::number(lat, 'f', 7));
+    lon_lbl_->setText(QString::number(lon, 'f', 7));
+    alt_lbl_->setText(QString::number(static_cast<double>(alt), 'f', 1));
+    lat_lbl_->setStyleSheet(style_valid);
+    lon_lbl_->setStyleSheet(style_valid);
+    alt_lbl_->setStyleSheet(style_valid);
+  } else {
+    lat_lbl_->setText("NO FIX");
+    lon_lbl_->setText("NO FIX");
+    alt_lbl_->setText("—");
+    lat_lbl_->setStyleSheet(style_invalid);
+    lon_lbl_->setStyleSheet(style_invalid);
+    alt_lbl_->setStyleSheet(style_invalid);
+  }
+}
+
+void FilterStatusPanel::onResetClicked() {
+  if (!reset_client_) return;
+  if (!reset_client_->service_is_ready()) {
+    reset_btn_->setText("Reset Filter  (unavailable)");
+    reset_btn_->setEnabled(false);
+    // Re-enable after 2s
+    QTimer::singleShot(2000, this, [this]() {
+      reset_btn_->setText("Reset Filter");
+      reset_btn_->setEnabled(true);
+    });
+    return;
+  }
+
+  reset_btn_->setEnabled(false);
+  reset_btn_->setText("Resetting…");
+
+  auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+  reset_client_->async_send_request(
+    request,
+    [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+      auto result = future.get();
+      // Update button on the GUI thread via a queued invocation
+      QMetaObject::invokeMethod(this, [this, success = result->success]() {
+        reset_btn_->setText(success ? "Reset Filter  ✓" : "Reset Filter  ✗");
+        QTimer::singleShot(2000, this, [this]() {
+          reset_btn_->setText("Reset Filter");
+          reset_btn_->setEnabled(true);
+        });
+      }, Qt::QueuedConnection);
+    });
 }
 
 }  // namespace tercom_rviz_plugins

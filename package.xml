@@ -12,7 +12,9 @@
   <depend>rclcpp</depend>
   <depend>rviz_common</depend>
   <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>pluginlib</depend>
   <depend>qt5_gui_libs</depend>

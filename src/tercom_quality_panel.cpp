@@ -159,6 +159,15 @@ TercomQualityPanel::TercomQualityPanel(QWidget* parent)
   session_lay->addWidget(reasons_lbl_, 1, 0, 1, 2);
 
   root->addWidget(session_box);
+  // ── Reset session button ──────────────────────────────────────────────────
+  reset_btn_ = new QPushButton("Reset Session Counters", this);
+  reset_btn_->setStyleSheet(
+    "QPushButton { background:#2a2a2a; color:#aaa; border:1px solid #555;"
+    " border-radius:3px; padding:3px 8px; font-size:10px; }"
+    "QPushButton:hover { background:#3a3a3a; color:#fff; }"
+    "QPushButton:pressed { background:#1a1a1a; }");
+  root->addWidget(reset_btn_);
+
   root->addStretch();
 
   // ── Cross-thread signals ──────────────────────────────────────────────────
@@ -171,6 +180,14 @@ TercomQualityPanel::TercomQualityPanel(QWidget* parent)
   connect(this, &TercomQualityPanel::rejectionReceived,
           this, &TercomQualityPanel::onRejectionReceived,
           Qt::QueuedConnection);
+
+  connect(reset_btn_, &QPushButton::clicked,
+          this, &TercomQualityPanel::onResetSession);
+
+  // Watchdog timer: check every second if the upstream node has gone silent
+  watchdog_timer_ = new QTimer(this);
+  connect(watchdog_timer_, &QTimer::timeout,
+          this, &TercomQualityPanel::onWatchdogTick);
 }
 
 // ── onInitialize ──────────────────────────────────────────────────────────────
@@ -178,6 +195,8 @@ TercomQualityPanel::TercomQualityPanel(QWidget* parent)
 void TercomQualityPanel::onInitialize()
 {
   node_ = getDisplayContext()->getRosNodeAbstraction().lock()->get_raw_node();
+  last_msg_time_ = std::chrono::steady_clock::now();
+  watchdog_timer_->start(1000);  // 1-second tick
   resubscribe();
 }
 
@@ -253,6 +272,13 @@ void TercomQualityPanel::onTopicEdited()
 
 void TercomQualityPanel::onStatusReceived(const QString& status)
 {
+  // Update watchdog timestamp; if node was silent, treat this as a restart
+  if (node_was_silent_) {
+    onResetSession();
+    node_was_silent_ = false;
+  }
+  last_msg_time_ = std::chrono::steady_clock::now();
+
   status_lbl_->setText(status);
 
   // Colour-code background by state
@@ -384,6 +410,30 @@ void TercomQualityPanel::onQualityReceived(const std::vector<float>& data)
 
   session_lbl_->setText(
     QString("Accepted: %1   Rejected: %2").arg(accepted_count_).arg(rejected_count_));
+}
+
+void TercomQualityPanel::onResetSession()
+{
+  accepted_count_ = 0;
+  rejected_count_ = 0;
+  session_lbl_->setText("Accepted: 0   Rejected: 0");
+  decision_badge_->setText("WAITING");
+  decision_badge_->setStyleSheet(
+    "font-weight: bold; font-size: 14px; padding: 6px; border-radius: 4px;"
+    "background: #333; color: #888;");
+  reasons_lbl_->clear();
+}
+
+void TercomQualityPanel::onWatchdogTick()
+{
+  auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - last_msg_time_).count();
+  if (elapsed_ms > 2000 && !node_was_silent_) {
+    node_was_silent_ = true;
+    // Dim the status label to indicate the node is offline
+    status_lbl_->setText("— (offline)");
+    status_lbl_->setStyleSheet("font-weight: bold; font-size: 13px; padding: 4px; color: #555;");
+  }
 }
 
 void TercomQualityPanel::onRejectionReceived(const QString& reason)

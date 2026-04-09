@@ -4,9 +4,12 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <geometry_msgs/msg/vector3_stamped.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 #include <QLabel>
 #include <QProgressBar>
+#include <QPushButton>
 #include <vector>
 
 #include "tercom_rviz_plugins/sparkline_widget.hpp"
@@ -25,6 +28,7 @@ Q_SIGNALS:
   void nisHistoryReceived(const std::vector<float>& data);
   void biasAccelReceived(float x, float y, float z);
   void biasGyroReceived(float x, float y, float z);
+  void positionReceived(double lat, double lon, float alt, int status);
 
 private Q_SLOTS:
   void onStateReceived(const QString& state);
@@ -32,6 +36,8 @@ private Q_SLOTS:
   void onNisHistoryReceived(const std::vector<float>& data);
   void onBiasAccelReceived(float x, float y, float z);
   void onBiasGyroReceived(float x, float y, float z);
+  void onPositionReceived(double lat, double lon, float alt, int status);
+  void onResetClicked();
 
 private:
   static QString badgeStyleSheet(const QString& bg, const QString& fg);
@@ -47,6 +53,9 @@ private:
   rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr sub_nis_;
   rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr sub_bias_accel_;
   rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr sub_bias_gyro_;
+  rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr sub_global_;
+
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr reset_client_;
 
   // Cached state for combined health assessment
   QString current_state_   {"UNKNOWN"};
@@ -67,6 +76,14 @@ private:
   QLabel*          gx_{nullptr};
   QLabel*          gy_{nullptr};
   QLabel*          gz_{nullptr};
+
+  // Position display
+  QLabel*          lat_lbl_{nullptr};
+  QLabel*          lon_lbl_{nullptr};
+  QLabel*          alt_lbl_{nullptr};
+
+  // Reset filter button
+  QPushButton*     reset_btn_{nullptr};
 };
 
 }  // namespace tercom_rviz_plugins

@@ -8,8 +8,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QProgressBar>
+#include <QPushButton>
 #include <QString>
+#include <QTimer>
 #include <vector>
+#include <chrono>
 
 namespace tercom_rviz_plugins {
 
@@ -31,6 +34,8 @@ private Q_SLOTS:
   void onQualityReceived(const std::vector<float>& data);
   void onRejectionReceived(const QString& reason);
   void onTopicEdited();
+  void onResetSession();
+  void onWatchdogTick();
 
 private:
   static QString progressBarStyle(const QString& color);
@@ -63,9 +68,15 @@ private:
   QLabel*        decision_badge_{nullptr};
   QLabel*        session_lbl_{nullptr};
   QLabel*        reasons_lbl_{nullptr};
+  QPushButton*   reset_btn_{nullptr};
 
   int accepted_count_{0};
   int rejected_count_{0};
+
+  // Watchdog: detect node restart and auto-reset session counters
+  QTimer*     watchdog_timer_{nullptr};
+  std::chrono::steady_clock::time_point last_msg_time_{};
+  bool        node_was_silent_{true};  // true until first message arrives
 };
 
 }  // namespace tercom_rviz_plugins

@@ -11,7 +11,9 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rviz_common REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets Charts)
@@ -46,7 +48,9 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   rviz_common
   std_msgs
+  std_srvs
   geometry_msgs
+  sensor_msgs
   visualization_msgs
   pluginlib
 )
@@ -70,6 +74,6 @@ install(FILES plugin_description.xml
 
 ament_export_include_directories(include)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(rclcpp rviz_common std_msgs geometry_msgs pluginlib Qt5)
+ament_export_dependencies(rclcpp rviz_common std_msgs std_srvs geometry_msgs sensor_msgs pluginlib Qt5)
 
 ament_package()
