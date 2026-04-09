@@ -1,0 +1,17 @@
+<library path="tercom_rviz_plugins">
+  <class name="tercom_rviz_plugins/FilterStatusPanel"
+         type="tercom_rviz_plugins::FilterStatusPanel"
+         base_class_type="rviz_common::Panel">
+    <description>ESKF filter state, NIS sparkline, and health gauges</description>
+  </class>
+  <class name="tercom_rviz_plugins/TercomQualityPanel"
+         type="tercom_rviz_plugins::TercomQualityPanel"
+         base_class_type="rviz_common::Panel">
+    <description>TERCOM match quality gauges and accept/reject decision</description>
+  </class>
+  <class name="tercom_rviz_plugins/ErrorHistoryPanel"
+         type="tercom_rviz_plugins::ErrorHistoryPanel"
+         base_class_type="rviz_common::Panel">
+    <description>Navigation error vs ground truth — live charts and statistics</description>
+  </class>
+</library>
