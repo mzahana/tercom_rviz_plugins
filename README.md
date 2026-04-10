@@ -131,6 +131,79 @@ X-axis tick spacing: 0.5 s per sample. Y-axis auto-scales to 1.2 × the maximum 
 
 ---
 
+### ProfilingPanel
+
+Displays execution time and call frequency for every timed component across all three
+`tercom_nav` nodes.  Use this panel to baseline performance on a new compute platform and to
+spot bottlenecks before they affect navigation quality.
+
+#### Column definitions
+
+| Column | What it measures |
+|--------|-----------------|
+| **Exec (ms)** | Average wall-clock time the function body spent running (from `start()` to `stop()` inside the callback). This is pure computation time — time spent blocked on I/O, sleeping, or waiting for the next message is **not** included. |
+| **Rate (Hz)** | Average call frequency — how many times per second the function is *invoked*, computed from the rolling average of inter-call intervals. |
+
+These two numbers are **completely independent**:
+
+- `cb_synced` showing `0.05 ms / 9.9 Hz` means the callback fires ~10 times per second
+  (driven by sensor message rate), but each invocation only spends 0.05 ms doing work.
+  The remaining ~99.95 ms per cycle is idle waiting time between messages — that is normal
+  and expected.
+- `run_matching` might show `180 ms / 9.9 Hz`. That means matching is being triggered at the
+  same sensor rate but each match takes 180 ms. If exec time approaches or exceeds
+  `1 / Rate`, the node cannot keep up and will start dropping callbacks.
+
+**Rule of thumb**: `Exec (ms) × Rate (Hz) / 1000 > 0.8` (i.e. > 80 % CPU utilisation on a
+single core) is the threshold at which a component becomes a bottleneck.
+
+#### Color coding (Exec column)
+
+| Color | Meaning |
+|-------|---------|
+| Green | Exec time is within the expected fast range for this component |
+| Amber | Exec time is elevated — monitor closely |
+| Red | Exec time exceeds the performance budget — bottleneck |
+| Dark grey | No data received yet (component not running) |
+
+Per-component thresholds are tuned to realistic expectations:
+
+| Component | Green limit | Red above |
+|-----------|------------|-----------|
+| tercom: cb_synced | 5 ms | 20 ms |
+| tercom: run_matching | 100 ms | 500 ms |
+| eskf: cb_imu | 1 ms | 5 ms |
+| eskf: cb_tercom_fix | 2 ms | 10 ms |
+| eskf: cb_altitude | 1 ms | 5 ms |
+| diag: timer_error | 10 ms | 50 ms |
+| diag: timer_paths | 20 ms | 100 ms |
+| diag: timer_stats | 5 ms | 20 ms |
+
+**Subscribed topics**
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/tercom/diagnostics_node/profiling` | `std_msgs/Float32MultiArray` | 16-float aggregated timing message (see below) |
+
+**Message layout** (`/tercom/diagnostics_node/profiling`, 16 floats)
+
+```
+[0-1]   tercom_node : cb_synced      → [exec_ms, hz]
+[2-3]   tercom_node : run_matching   → [exec_ms, hz]
+[4-5]   eskf_node   : cb_imu         → [exec_ms, hz]
+[6-7]   eskf_node   : cb_tercom_fix  → [exec_ms, hz]
+[8-9]   eskf_node   : cb_altitude    → [exec_ms, hz]
+[10-11] diag_node   : timer_error    → [exec_ms, hz]
+[12-13] diag_node   : timer_paths    → [exec_ms, hz]
+[14-15] diag_node   : timer_stats    → [exec_ms, hz]
+```
+
+The aggregated topic is assembled by `diagnostics_node`, which subscribes to
+`/tercom/tercom_node/timing` (4 floats) and `/tercom/eskf_node/timing` (6 floats) and adds
+its own three timer measurements before publishing.
+
+---
+
 ## SparklineWidget (internal)
 
 A lightweight `QWidget` subclass that renders a line chart with `QPainter` — no QtCharts
@@ -179,6 +252,7 @@ If you open a blank RViz2 session, add panels via **Panels → Add New Panel** a
 - `tercom_rviz_plugins/FilterStatusPanel`
 - `tercom_rviz_plugins/TercomQualityPanel`
 - `tercom_rviz_plugins/ErrorHistoryPanel`
+- `tercom_rviz_plugins/ProfilingPanel`
 
 ---
 
@@ -194,12 +268,14 @@ tercom_rviz_plugins/
 │   ├── sparkline_widget.hpp
 │   ├── filter_status_panel.hpp
 │   ├── tercom_quality_panel.hpp
-│   └── error_history_panel.hpp
+│   ├── error_history_panel.hpp
+│   └── profiling_panel.hpp
 └── src/
     ├── sparkline_widget.cpp
     ├── filter_status_panel.cpp
     ├── tercom_quality_panel.cpp
-    └── error_history_panel.cpp
+    ├── error_history_panel.cpp
+    └── profiling_panel.cpp
 ```
 
 ---

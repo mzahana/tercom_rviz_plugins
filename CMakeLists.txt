@@ -23,6 +23,7 @@ set(SOURCES
   src/filter_status_panel.cpp
   src/tercom_quality_panel.cpp
   src/error_history_panel.cpp
+  src/profiling_panel.cpp
 )
 
 set(HEADERS
@@ -30,6 +31,7 @@ set(HEADERS
   include/tercom_rviz_plugins/filter_status_panel.hpp
   include/tercom_rviz_plugins/tercom_quality_panel.hpp
   include/tercom_rviz_plugins/error_history_panel.hpp
+  include/tercom_rviz_plugins/profiling_panel.hpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})

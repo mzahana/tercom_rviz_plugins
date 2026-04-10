@@ -14,4 +14,9 @@
          base_class_type="rviz_common::Panel">
     <description>Navigation error vs ground truth — live charts and statistics</description>
   </class>
+  <class name="tercom_rviz_plugins/ProfilingPanel"
+         type="tercom_rviz_plugins::ProfilingPanel"
+         base_class_type="rviz_common::Panel">
+    <description>Execution time and call frequency profiler for all TERCOM/ESKF components</description>
+  </class>
 </library>
