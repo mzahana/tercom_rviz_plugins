@@ -106,6 +106,24 @@ FilterStatusPanel::FilterStatusPanel(QWidget* parent)
   innov_row->addWidget(innov_lbl_);
   health_lay->addLayout(innov_row);
 
+  auto* reset_row = new QHBoxLayout();
+  reset_row->addWidget(new QLabel("Soft Resets", health_group));
+  reset_row->addStretch();
+  soft_resets_lbl_ = new QLabel("0", health_group);
+  soft_resets_lbl_->setMinimumWidth(25);
+  soft_resets_lbl_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  reset_row->addWidget(soft_resets_lbl_);
+  health_lay->addLayout(reset_row);
+  
+  auto* hreset_row = new QHBoxLayout();
+  hreset_row->addWidget(new QLabel("Hard Resets", health_group));
+  hreset_row->addStretch();
+  hard_resets_lbl_ = new QLabel("0", health_group);
+  hard_resets_lbl_->setMinimumWidth(25);
+  hard_resets_lbl_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  hreset_row->addWidget(hard_resets_lbl_);
+  health_lay->addLayout(hreset_row);
+
   root->addWidget(health_group);
 
   // IMU Bias group
@@ -271,6 +289,14 @@ void FilterStatusPanel::onHealthReceived(const std::vector<float>& data) {
   current_avg_nis_ = data[0];
   current_sigma_   = data[1];
   current_innov_   = data[2];
+  if (data.size() > 4) {
+    current_soft_reset_count_ = data[4];
+    soft_resets_lbl_->setText(QString::number(static_cast<int>(current_soft_reset_count_)));
+  }
+  if (data.size() > 5) {
+    current_hard_reset_count_ = data[5];
+    hard_resets_lbl_->setText(QString::number(static_cast<int>(current_hard_reset_count_)));
+  }
 
   // sigma_limit: 200 m covers the initialization phase (GPS init + early filter).
   // Green (<120 m) = converging/converged, yellow (120–170 m) = marginal,

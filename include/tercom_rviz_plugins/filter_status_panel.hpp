@@ -62,6 +62,8 @@ private:
   float   current_sigma_   {0.f};
   float   current_avg_nis_ {0.f};
   float   current_innov_   {0.f};
+  float   current_soft_reset_count_ {0.f};
+  float   current_hard_reset_count_ {0.f};
 
   QLabel*          health_led_{nullptr};
   QLabel*          state_badge_{nullptr};
@@ -70,6 +72,8 @@ private:
   QLabel*          sigma_lbl_{nullptr};
   QProgressBar*    innov_bar_{nullptr};
   QLabel*          innov_lbl_{nullptr};
+  QLabel*          soft_resets_lbl_{nullptr};
+  QLabel*          hard_resets_lbl_{nullptr};
   QLabel*          ax_{nullptr};
   QLabel*          ay_{nullptr};
   QLabel*          az_{nullptr};
